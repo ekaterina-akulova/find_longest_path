@@ -1,11 +1,9 @@
 import networkx as nx
 from pipeline.steps.make_graph import as_spanning_trees
 import ast
-from multiprocessing import Pool
-import queue
-
-str_nodes = ""
-
+import multiprocessing as mp
+from multiprocessing.pool import ThreadPool
+import math
 
 def to_acyclic_graph(G: nx.DiGraph):
     if nx.is_directed_acyclic_graph(G) == False:
@@ -21,90 +19,12 @@ def subgraphs(g: nx.DiGraph):
 
 def get_max_lenght(tree):
     dict_path = {}
-    # print("nx.is_directed_acyclic_graph(tree) = ", nx.is_directed_acyclic_graph(tree))
     tree = to_acyclic_graph(tree)
     subrgarhs = subgraphs(tree)
-    # print("len subgraphs in get_max_lenght(tree) = ", len(subrgarhs))
     for graph in subrgarhs:
-        # print(nx.find_cycle(graph))
         dict_path[str(nx.dag_longest_path(graph))] = len(nx.dag_longest_path(graph))
-    # print(max(list_len))
-    # print(list_len)
-    # print(max(dict_path, key=dict_path.get))
-    # print(dict_path)
     return_list = ast.literal_eval(max(dict_path, key=dict_path.get))
     return return_list
-
-
-def get_max_len(graph: nx.DiGraph):
-    subgraph = subgraphs(graph)
-    # print(subgraph)
-    # print(type(subgraph))
-    # print("len subgraphs in get_max_lenght(tree) = ", len(subgraph))
-    # with Pool(20) as pool:
-    lenghts = [get_max_lenght_from_subgraph(graph, ) for graph in subgraph]
-    # lenghts = [get_max_lenght_from_subgraph(graph, ) for graph in subgraph]
-    # print(str_nodes)
-    # print(str_split(str_nodes, max(lenghts)))
-    print("choosing max from get_max_len BETWEEN: ", lenghts)
-    return max(lenghts)
-
-
-def get_max_lenght_from_subgraph(graph: nx.DiGraph):
-#     print(type(graph))
-    lenghts = []
-    for vertex in graph.nodes():
-        lenghts.append(get_max_lenght_recursiv(graph, vertex, ))
-    # print("LENS = ",   lenghts)
-    return max(lenghts)
-
-
-def get_paths(max_len):
-    return str_split(str_nodes, max_len)
-
-
-def str_split(st, num):
-    nds = [x.split(',') for x in st.split('\n')]
-    tpl = {tuple(n) for n in nds if len(n) >= num}
-    new_lst = [list(i) for i in tpl]
-    return new_lst
-
-
-def str_append(nodes=None):
-    global str_nodes
-    for node in nodes:
-        if node != nodes[0]:
-            str_nodes += ', ' + node
-        else:
-            str_nodes += node
-    # print(str_nodes)
-    str_nodes += '\n'
-
-
-def get_max_lenght_recursiv(G: nx.DiGraph, vertex, previous_vertexes=None,):
-    if previous_vertexes == None:
-        previous_vertexes = []
-    while (previous_vertexes != [] and len(list(G.predecessors(vertex))) > 0
-            and previous_vertexes[-1] not in G.predecessors(vertex)):
-        previous_vertexes.remove(previous_vertexes[-1])
-    if vertex not in previous_vertexes:
-        previous_vertexes += [vertex]
-        # list_append(previous_vertexes)
-    else:
-        return len(previous_vertexes)
-    if len(list(G.successors(vertex))) > 0:
-        lenghts = []
-        child_vertexes = list(G.successors(vertex))
-        # print("G.successors(vertex) ", list(child_vertexes))
-        for child_vertex in child_vertexes:
-            # print("child_vertex = ", child_vertex)
-            lenght = get_max_lenght_recursiv(G, child_vertex, previous_vertexes, )
-            lenghts += [lenght]
-            str_append(previous_vertexes)
-        return max(lenghts)
-    else:
-        # print("!!!!!else!!!!!")
-        return len(previous_vertexes)
 
 
 def find_longest_path_from(graph, start, path=None):
@@ -121,6 +41,54 @@ def find_longest_path_from(graph, start, path=None):
     return max_path
 
 
+def find_nongest_path_on_nodes(graph, nds):
+    max_path = []
+    for node in nds:
+        if (node != None):
+            if len(list(graph.predecessors(node))) == 0:
+                candidate_path = find_longest_path_from(graph, node)
+                if len(candidate_path) > len(max_path):
+                    max_path = candidate_path
+    return max_path
+
+
+def find_longest_path_nodes_mp(graph):
+    max_path = []
+    res = []
+    n_workers = mp.cpu_count()
+    subgraph = subgraphs(graph)
+    max_sub = max_len_sub(subgraph)
+    nodes = list(max_sub.nodes())
+    if len(max_sub) > n_workers:
+        nds = list(func_chunks_num(nodes, n_workers))
+    else:
+        n_workers = len(max_sub)
+        nds = list(func_chunks_num(nodes, n_workers))
+    with ThreadPool(processes=n_workers) as pool:
+        for nodes in nds:
+            res.append(pool.apply_async(find_nongest_path_on_nodes, (max_sub, nodes,)).get())
+    for candidate_path in res:
+        if len(candidate_path) > len(max_path):
+            max_path = candidate_path
+    return max_path
+
+
+def func_chunks_num(lst, c_num):
+    n = math.ceil(len(lst) / c_num)
+    for x in range(0, len(lst), n):
+        e_c = lst[x : n + x]
+        yield e_c
+
+
+
+def max_len_sub(subs):
+    max_sub = []
+    for sub in subs:
+        if len(sub) > len(max_sub):
+            max_sub = sub
+    return max_sub
+
+
 def find_longest_path_sub(graph):
     max_path = []
     for node in graph.nodes():
@@ -129,14 +97,41 @@ def find_longest_path_sub(graph):
             max_path = candidate_path
     return max_path
 
+def find_nongest_path_on_subgraphs(subgraphs: list):
+    max_path = []
+    for sub in subgraphs:
+        path = find_longest_path_sub(sub)
+        if len(path) > len(max_path):
+            max_path = path
+    return max_path
+
+
+def find_longest_path_with_multiprocessing(graph):
+    n_workers = mp.cpu_count()
+    max_path = []
+    res = []
+    subgraph = list(subgraphs(graph))
+    subgraph_count = len(subgraph)
+    if subgraph_count > n_workers:
+        subs = list(func_chunks_num(subgraph, n_workers))
+    else:
+        n_workers = subgraph_count
+        subs = [[sub] for sub in subgraph]
+    with ThreadPool(processes=n_workers) as pool:
+        for sub in subs:
+            res.append(pool.apply_async(find_nongest_path_on_subgraphs, (sub, )).get())
+    for candidate_path in res:
+        if len(candidate_path) > len(max_path):
+            max_path = candidate_path
+    return max_path
+
+
 
 def find_longest_path(graph):
     max_path = []
-    q = queue.Queue()
     subgraph = subgraphs(graph)
     for sub in subgraph:
-        q.put(find_longest_path_sub(sub))
-    while not q.empty():
-        if len(q.get()) > len(max_path):
-            max_path = q.get()
+        candidate_path = find_longest_path_sub(sub)
+        if len(candidate_path) > len(max_path):
+            max_path = candidate_path
     return max_path

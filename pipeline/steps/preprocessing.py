@@ -1,3 +1,5 @@
+import re
+
 import pandas as pd
 from pyspark.sql.functions import mean
 from matplotlib import pyplot as plt
@@ -26,11 +28,14 @@ def preprocessing_spark(df, num):
     df = df.filter(df.dst != '0.0.0.0')
     df = df.filter(df.src != '127.0.0.1')
     df = df.filter(df.dst != '127.0.0.1')
+    # not_digit = re.compile('[a-zA-Z]')
+    # not_digit.match(dst)
+    # df = df[df.dst]
     df = df.filter(df.src != df.dst)
-    print("Before filtering by count df has ", df.count(), " rows.")
+    # print("Before filtering by count df has ", df.count(), " rows.")
     mean_num = df.select(F.mean("cnt")).collect()[0][0]
     df = df.filter(df.cnt > str(mean_num))
-    print("After filtering by count df has ", df.count(), " rows.")
+    # print("After filtering by count df has ", df.count(), " rows.")
     df = df.take(num)
     print("Taking ", num, "rows.\n\n\n")
 

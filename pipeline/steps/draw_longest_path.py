@@ -35,8 +35,8 @@ def list_to_nx_path(g, path):
         return (path_nx)
 
 
-def draw_networkx(paths_nx):
+def draw_networkx(path_nx):
     g = nx.DiGraph()
-    g.add_edges_from(paths_nx)
+    g.add_edges_from(path_nx)
     nx.draw_networkx(g)
     plt.show()

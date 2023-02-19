@@ -1,4 +1,3 @@
-import pandas as pd
 import networkx as nx
 
 def as_spanning_trees(G):
@@ -9,9 +8,7 @@ def as_spanning_trees(G):
     # For each of these graphs we extract the spanning tree, removing the cycles
     for g in graphs:
         T = nx.algorithms.minimum_spanning_tree(g.to_undirected())
-        E = set(T.edges())  # optimization
-        # l = [e for e in G.edges() if e in E or reversed(e) in E]
-
+        E = set(T.edges())
         G2.add_edges_from(E)
         G2.add_nodes_from(T.nodes())
 
@@ -28,7 +25,6 @@ def make_example_graph():
 
 def make_graph(df):
     graph = nx.DiGraph()
-    # df_to_graph = df.values.tolist()
     graph.add_weighted_edges_from(df)
     # print(nx.is_directed_acyclic_graph(graph))
     # print(nx.is_directed(graph))
